@@ -56,33 +56,37 @@ export default function DrawScreen() {
     );
   }, []);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(() => {
     if (isSavingRef.current) return;
     isSavingRef.current = true;
 
-    try {
-      const snapshot = canvasRef.current?.getSnapshot();
-      if (!snapshot) {
-        isSavingRef.current = false;
-        return;
-      }
+    const doSave = async () => {
+      try {
+        const snapshot = canvasRef.current?.getSnapshot();
+        if (!snapshot) {
+          isSavingRef.current = false;
+          return;
+        }
 
-      const encoded = snapshot.encodeToBase64();
-      if (!encoded) {
+        const encoded = snapshot.encodeToBase64();
+        if (!encoded) {
+          Alert.alert("Feil", "Kunne ikke lagre tegningen. Prøv igjen.");
+          isSavingRef.current = false;
+          return;
+        }
+
+        await saveDrawing(encoded);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      } catch (error) {
+        console.warn("Save failed:", error);
         Alert.alert("Feil", "Kunne ikke lagre tegningen. Prøv igjen.");
+      } finally {
         isSavingRef.current = false;
-        return;
       }
+    };
 
-      await saveDrawing(encoded);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-    } catch (error) {
-      console.warn("Save failed:", error);
-      Alert.alert("Feil", "Kunne ikke lagre tegningen. Prøv igjen.");
-    } finally {
-      isSavingRef.current = false;
-    }
+    void doSave();
   }, []);
 
   const handleBack = useCallback(() => {
@@ -120,7 +124,7 @@ export default function DrawScreen() {
         onStrokeWidthChange={setStrokeWidth}
         onUndo={handleUndo}
         onClear={handleClear}
-        onSave={() => void handleSave()}
+        onSave={handleSave}
         isEraser={isEraser}
         onToggleEraser={handleToggleEraser}
       />

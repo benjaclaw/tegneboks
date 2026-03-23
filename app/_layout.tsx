@@ -12,9 +12,15 @@ import { View, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SystemUI from "expo-system-ui";
+import * as SplashScreen from "expo-splash-screen";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Pencil } from "lucide-react-native";
 import { colors } from "../src/theme";
+
+// Hold splash synlig til vi er klare
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Ignorer feil — noen miljøer støtter ikke dette
+});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -26,6 +32,15 @@ export default function RootLayout() {
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(colors.background);
   }, []);
+
+  useEffect(() => {
+    // Skjul splash når fonter er lastet eller feilet
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {
+        // Ignorer feil
+      });
+    }
+  }, [fontsLoaded, fontError]);
 
   // Vis appen selv om fonter feiler — bruk systemfont som fallback
   if (!fontsLoaded && !fontError) {

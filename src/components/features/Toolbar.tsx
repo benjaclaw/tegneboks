@@ -1,19 +1,12 @@
-import { useEffect } from "react";
-import { View, ScrollView, Pressable } from "react-native";
+import { useEffect, useCallback, memo } from "react";
+import { View, ScrollView, Pressable, StyleSheet } from "react-native";
 import Animated, {
   useAnimatedStyle,
   withSpring,
   useSharedValue,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import {
-  Undo2,
-  Eraser,
-  Pencil,
-  Plus,
-  Download,
-  Circle,
-} from "lucide-react-native";
+import { Undo2, Eraser, Plus, Download } from "lucide-react-native";
 import { IconButton } from "../ui/IconButton";
 import { ColorCircle } from "../ui/ColorCircle";
 import { colors, drawingColors, penSizes } from "../../theme";
@@ -47,12 +40,11 @@ function StrokeSizeButton({
     transform: [{ scale: scale.value }],
   }));
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
-  };
+  }, [onPress]);
 
-  // Flytt scale-oppdatering til useEffect for å unngå render-loop
   useEffect(() => {
     scale.value = withSpring(selected ? 1.15 : 1, {
       damping: 12,
@@ -60,7 +52,6 @@ function StrokeSizeButton({
     });
   }, [selected, scale]);
 
-  // Visuell størrelse: tynn=8, medium=14, tykk=22
   const dotSize = size === penSizes.thin ? 8 : size === penSizes.medium ? 14 : 22;
 
   return (
@@ -70,31 +61,27 @@ function StrokeSizeButton({
       accessibilityRole="button"
       style={[
         animatedStyle,
+        styles.strokeButton,
         {
-          width: 60,
-          height: 60,
-          borderRadius: 9999,
           backgroundColor: selected ? colors.toolbar : colors.surface,
-          borderWidth: 2,
           borderColor: selected ? colors.primary : colors.border,
-          alignItems: "center",
-          justifyContent: "center",
         },
       ]}
     >
       <View
-        style={{
-          width: dotSize,
-          height: dotSize,
-          borderRadius: 9999,
-          backgroundColor: colors.text,
-        }}
+        style={[
+          styles.strokeDot,
+          {
+            width: dotSize,
+            height: dotSize,
+          },
+        ]}
       />
     </AnimatedPressable>
   );
 }
 
-export function Toolbar({
+export const Toolbar = memo(function Toolbar({
   selectedColor,
   selectedStrokeWidth,
   onColorChange,
@@ -106,25 +93,13 @@ export function Toolbar({
   onToggleEraser,
 }: ToolbarProps) {
   return (
-    <View
-      style={{
-        backgroundColor: colors.toolbar,
-        borderTopWidth: 2,
-        borderTopColor: colors.border,
-        paddingBottom: 24,
-        paddingTop: 12,
-      }}
-    >
+    <View style={styles.container}>
       {/* Fargevelger */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          gap: 10,
-          alignItems: "center",
-        }}
-        style={{ marginBottom: 12 }}
+        contentContainerStyle={styles.colorScrollContent}
+        style={styles.colorScroll}
       >
         {drawingColors.map((c) => (
           <ColorCircle
@@ -137,15 +112,7 @@ export function Toolbar({
       </ScrollView>
 
       {/* Verktøy-rad */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: 12,
-          paddingHorizontal: 16,
-        }}
-      >
+      <View style={styles.toolRow}>
         {/* Penntykkelse */}
         {[penSizes.thin, penSizes.medium, penSizes.thick].map((size) => (
           <StrokeSizeButton
@@ -157,16 +124,8 @@ export function Toolbar({
         ))}
 
         {/* Separator */}
-        <View
-          style={{
-            width: 2,
-            height: 40,
-            backgroundColor: colors.border,
-            marginHorizontal: 4,
-          }}
-        />
+        <View style={styles.separator} />
 
-        {/* Viskelær */}
         <IconButton
           icon={Eraser}
           onPress={onToggleEraser}
@@ -174,21 +133,18 @@ export function Toolbar({
           accessibilityLabel="Viskelær"
         />
 
-        {/* Angre */}
         <IconButton
           icon={Undo2}
           onPress={onUndo}
           accessibilityLabel="Angre"
         />
 
-        {/* Ny tegning */}
         <IconButton
           icon={Plus}
           onPress={onClear}
           accessibilityLabel="Ny tegning"
         />
 
-        {/* Lagre */}
         <IconButton
           icon={Download}
           onPress={onSave}
@@ -199,4 +155,47 @@ export function Toolbar({
       </View>
     </View>
   );
-}
+});
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: colors.toolbar,
+    borderTopWidth: 2,
+    borderTopColor: colors.border,
+    paddingBottom: 24,
+    paddingTop: 12,
+  },
+  colorScroll: {
+    marginBottom: 12,
+  },
+  colorScrollContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+    alignItems: "center",
+  },
+  toolRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+  },
+  separator: {
+    width: 2,
+    height: 40,
+    backgroundColor: colors.border,
+    marginHorizontal: 4,
+  },
+  strokeButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 9999,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  strokeDot: {
+    borderRadius: 9999,
+    backgroundColor: colors.text,
+  },
+});

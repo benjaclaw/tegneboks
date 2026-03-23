@@ -18,11 +18,22 @@ interface StoredDrawingList {
   drawings: SavedDrawing[];
 }
 
+// Enkel mutex for å forhindre samtidige skrive-operasjoner
+let writeLock: Promise<void> = Promise.resolve();
+
+function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+  const current = writeLock;
+  let resolve: () => void;
+  writeLock = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return current.then(fn).finally(() => resolve());
+}
+
 function isValidDrawingList(data: unknown): data is StoredDrawingList {
   if (!data || typeof data !== "object") return false;
   const obj = data as Record<string, unknown>;
   if (!Array.isArray(obj.drawings)) return false;
-  // Valider at hvert element har riktig form
   return obj.drawings.every(
     (d: unknown) =>
       d !== null &&
@@ -40,11 +51,10 @@ export async function saveDrawing(imageBase64: string): Promise<SavedDrawing> {
     createdAt: Date.now(),
   };
 
-  try {
+  await withWriteLock(async () => {
     const existing = await getDrawings();
     existing.unshift(drawing);
 
-    // Begrens antall
     let limited = existing.slice(0, MAX_DRAWINGS);
 
     // Sjekk total størrelse og fjern eldste til vi er under grensen
@@ -55,10 +65,7 @@ export async function saveDrawing(imageBase64: string): Promise<SavedDrawing> {
     }
 
     await AsyncStorage.setItem(DRAWINGS_KEY, serialized);
-  } catch (error) {
-    console.warn("Failed to save drawing:", error);
-    throw error;
-  }
+  });
 
   return drawing;
 }
@@ -88,7 +95,7 @@ export async function getDrawings(): Promise<SavedDrawing[]> {
 }
 
 export async function deleteDrawing(id: string): Promise<void> {
-  try {
+  await withWriteLock(async () => {
     const drawings = await getDrawings();
     const filtered = drawings.filter((d) => d.id !== id);
 
@@ -96,10 +103,7 @@ export async function deleteDrawing(id: string): Promise<void> {
       DRAWINGS_KEY,
       JSON.stringify({ drawings: filtered } satisfies StoredDrawingList)
     );
-  } catch (error) {
-    console.warn("Failed to delete drawing:", error);
-    throw error;
-  }
+  });
 }
 
 export async function getDrawingById(

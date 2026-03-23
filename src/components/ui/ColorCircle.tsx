@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Pressable } from "react-native";
+import { useEffect, useCallback, memo } from "react";
+import { Pressable, StyleSheet } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -15,14 +15,17 @@ interface ColorCircleProps {
   onPress: () => void;
 }
 
-export function ColorCircle({ color, selected, onPress }: ColorCircleProps) {
+export const ColorCircle = memo(function ColorCircle({
+  color,
+  selected,
+  onPress,
+}: ColorCircleProps) {
   const scale = useSharedValue(selected ? 1.2 : 1);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  // Oppdater scale når selected endres — i useEffect, ikke render body
   useEffect(() => {
     scale.value = withSpring(selected ? 1.2 : 1, {
       damping: 12,
@@ -30,21 +33,21 @@ export function ColorCircle({ color, selected, onPress }: ColorCircleProps) {
     });
   }, [selected, scale]);
 
-  const handlePressIn = () => {
+  const handlePressIn = useCallback(() => {
     scale.value = withSpring(0.9, { damping: 15, stiffness: 300 });
-  };
+  }, [scale]);
 
-  const handlePressOut = () => {
+  const handlePressOut = useCallback(() => {
     scale.value = withSpring(selected ? 1.2 : 1, {
       damping: 12,
       stiffness: 200,
     });
-  };
+  }, [selected, scale]);
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
-  };
+  }, [onPress]);
 
   return (
     <AnimatedPressable
@@ -55,20 +58,26 @@ export function ColorCircle({ color, selected, onPress }: ColorCircleProps) {
       accessibilityRole="button"
       style={[
         animatedStyle,
+        styles.circle,
         {
-          width: 48,
-          height: 48,
-          borderRadius: 9999,
           backgroundColor: color,
-          borderWidth: 3,
           borderColor: selected ? "#2C2C2C" : "#FFFFFF",
           shadowColor: selected ? color : "transparent",
-          shadowOffset: { width: 0, height: 2 },
           shadowOpacity: selected ? 0.4 : 0,
-          shadowRadius: 6,
           elevation: selected ? 4 : 0,
         },
       ]}
     />
   );
-}
+});
+
+const styles = StyleSheet.create({
+  circle: {
+    width: 48,
+    height: 48,
+    borderRadius: 9999,
+    borderWidth: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+  },
+});
