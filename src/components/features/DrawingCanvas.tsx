@@ -1,5 +1,5 @@
-import { useCallback, useRef, useImperativeHandle, forwardRef, useState } from "react";
-import { View, LayoutChangeEvent } from "react-native";
+import { useRef, useImperativeHandle, forwardRef, useState, useCallback } from "react";
+import { View } from "react-native";
 import {
   Canvas,
   Path,
@@ -10,7 +10,6 @@ import type { SkPath, SkImage } from "@shopify/react-native-skia";
 import {
   Gesture,
   GestureDetector,
-  GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import { colors } from "../../theme";
 
@@ -35,11 +34,11 @@ interface DrawingCanvasProps {
 export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
   function DrawingCanvas({ color, strokeWidth, onPathsChange }, ref) {
     const [paths, setPaths] = useState<PathData[]>([]);
-    const currentPathRef = useRef<SkPath | null>(null);
+    const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
     const currentColorRef = useRef(color);
     const currentStrokeRef = useRef(strokeWidth);
     const canvasRef = useCanvasRef();
-    const [, setRenderTick] = useState(0);
+    const pointCountRef = useRef(0);
 
     // Hold refs oppdatert med nåværende verdier
     currentColorRef.current = color;
@@ -55,6 +54,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       },
       clear: () => {
         setPaths([]);
+        setCurrentPath(null);
         onPathsChange?.(0);
       },
       getSnapshot: () => {
@@ -63,71 +63,80 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     }));
 
     const panGesture = Gesture.Pan()
+      .runOnJS(true)
       .minDistance(0)
       .onBegin((e) => {
         const path = Skia.Path.Make();
         path.moveTo(e.x, e.y);
-        currentPathRef.current = path;
-        setRenderTick((t) => t + 1);
+        pointCountRef.current = 0;
+        setCurrentPath(path);
       })
       .onUpdate((e) => {
-        if (currentPathRef.current) {
-          currentPathRef.current.lineTo(e.x, e.y);
-          setRenderTick((t) => t + 1);
-        }
+        setCurrentPath((prev) => {
+          if (!prev) return null;
+          prev.lineTo(e.x, e.y);
+          pointCountRef.current += 1;
+          // Return a copy every 3 points to trigger re-render without
+          // excessive copies. Skia renders the mutated path even without
+          // copy, but React needs a new reference to schedule a render.
+          if (pointCountRef.current % 3 === 0) {
+            return prev.copy();
+          }
+          return prev;
+        });
       })
       .onEnd(() => {
-        if (currentPathRef.current) {
-          const finishedPath = currentPathRef.current;
-          const pathColor = currentColorRef.current;
-          const pathStroke = currentStrokeRef.current;
-          currentPathRef.current = null;
+        setCurrentPath((prev) => {
+          if (prev) {
+            const finishedPath = prev.copy();
+            const pathColor = currentColorRef.current;
+            const pathStroke = currentStrokeRef.current;
 
-          setPaths((prev) => {
-            const next = [
-              ...prev,
-              {
-                path: finishedPath,
-                color: pathColor,
-                strokeWidth: pathStroke,
-              },
-            ];
-            onPathsChange?.(next.length);
-            return next;
-          });
-        }
+            setPaths((prevPaths) => {
+              const next = [
+                ...prevPaths,
+                {
+                  path: finishedPath,
+                  color: pathColor,
+                  strokeWidth: pathStroke,
+                },
+              ];
+              onPathsChange?.(next.length);
+              return next;
+            });
+          }
+          return null;
+        });
       });
 
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <GestureDetector gesture={panGesture}>
-          <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-            <Canvas ref={canvasRef} style={{ flex: 1 }}>
-              {paths.map((pathData, index) => (
-                <Path
-                  key={`path-${index}`}
-                  path={pathData.path}
-                  color={pathData.color}
-                  style="stroke"
-                  strokeWidth={pathData.strokeWidth}
-                  strokeCap="round"
-                  strokeJoin="round"
-                />
-              ))}
-              {currentPathRef.current && (
-                <Path
-                  path={currentPathRef.current}
-                  color={color}
-                  style="stroke"
-                  strokeWidth={strokeWidth}
-                  strokeCap="round"
-                  strokeJoin="round"
-                />
-              )}
-            </Canvas>
-          </View>
-        </GestureDetector>
-      </GestureHandlerRootView>
+      <GestureDetector gesture={panGesture}>
+        <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+          <Canvas ref={canvasRef} style={{ flex: 1 }}>
+            {paths.map((pathData, index) => (
+              <Path
+                key={`path-${index}`}
+                path={pathData.path}
+                color={pathData.color}
+                style="stroke"
+                strokeWidth={pathData.strokeWidth}
+                strokeCap="round"
+                strokeJoin="round"
+              />
+            ))}
+            {currentPath && (
+              <Path
+                path={currentPath}
+                color={color}
+                style="stroke"
+                strokeWidth={strokeWidth}
+                strokeCap="round"
+                strokeJoin="round"
+              />
+            )}
+          </Canvas>
+        </View>
+      </GestureDetector>
     );
   }
 );
