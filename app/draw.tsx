@@ -1,9 +1,17 @@
 import { useRef, useState, useCallback } from "react";
-import { View, Alert, StyleSheet } from "react-native";
+import { View, Alert, StyleSheet, Pressable, Text } from "react-native";
 import { router } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
+import { ArrowLeft, Palette } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  FadeIn,
+  FadeOut,
+} from "react-native-reanimated";
 import {
   DrawingCanvas,
   type DrawingCanvasRef,
@@ -17,10 +25,12 @@ export default function DrawScreen() {
   const canvasRef = useRef<DrawingCanvasRef>(null);
   const insets = useSafeAreaInsets();
   const isSavingRef = useRef(false);
+  const hasDrawnRef = useRef(false);
 
   const [selectedColor, setSelectedColor] = useState<string>(drawingColors[0]);
   const [strokeWidth, setStrokeWidth] = useState<number>(penSizes.medium);
   const [isEraser, setIsEraser] = useState(false);
+  const [toolbarOpen, setToolbarOpen] = useState(false);
 
   const activeColor = isEraser ? "#FFFFFF" : selectedColor;
 
@@ -50,6 +60,7 @@ export default function DrawScreen() {
           onPress: () => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             canvasRef.current?.clear();
+            hasDrawnRef.current = false;
           },
         },
       ]
@@ -90,7 +101,36 @@ export default function DrawScreen() {
   }, []);
 
   const handleBack = useCallback(() => {
-    router.back();
+    // Spør om å lagre hvis bruker har tegnet noe
+    if (hasDrawnRef.current) {
+      Alert.alert(
+        "Lagre tegning?",
+        "Du har en tegning som ikke er lagret.",
+        [
+          {
+            text: "Forkast",
+            style: "destructive",
+            onPress: () => router.back(),
+          },
+          { text: "Avbryt", style: "cancel" },
+          {
+            text: "Lagre",
+            onPress: () => handleSave(),
+          },
+        ]
+      );
+    } else {
+      router.back();
+    }
+  }, [handleSave]);
+
+  const handlePathsChange = useCallback(() => {
+    hasDrawnRef.current = true;
+  }, []);
+
+  const toggleToolbar = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setToolbarOpen((prev) => !prev);
   }, []);
 
   return (
@@ -98,7 +138,7 @@ export default function DrawScreen() {
       {/* Tilbake-knapp */}
       <View
         style={[
-          styles.backButton,
+          styles.topLeft,
           { top: insets.top + 8 },
         ]}
       >
@@ -114,20 +154,63 @@ export default function DrawScreen() {
         ref={canvasRef}
         color={activeColor}
         strokeWidth={strokeWidth}
+        onPathsChange={handlePathsChange}
       />
 
-      {/* Verktøylinje */}
-      <Toolbar
-        selectedColor={selectedColor}
-        selectedStrokeWidth={strokeWidth}
-        onColorChange={handleColorChange}
-        onStrokeWidthChange={setStrokeWidth}
-        onUndo={handleUndo}
-        onClear={handleClear}
-        onSave={handleSave}
-        isEraser={isEraser}
-        onToggleEraser={handleToggleEraser}
-      />
+      {/* FAB for verktøy */}
+      <View
+        style={[
+          styles.fabContainer,
+          { bottom: insets.bottom + 16 },
+        ]}
+      >
+        {toolbarOpen && (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+          >
+            <Toolbar
+              selectedColor={selectedColor}
+              selectedStrokeWidth={strokeWidth}
+              onColorChange={handleColorChange}
+              onStrokeWidthChange={setStrokeWidth}
+              onUndo={handleUndo}
+              onClear={handleClear}
+              onSave={handleSave}
+              isEraser={isEraser}
+              onToggleEraser={handleToggleEraser}
+              bottomInset={insets.bottom}
+            />
+          </Animated.View>
+        )}
+
+        {!toolbarOpen && (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+          >
+            <Pressable
+              onPress={toggleToolbar}
+              style={[
+                styles.fab,
+                { backgroundColor: selectedColor === "#FFFFFF" || isEraser ? colors.text : selectedColor },
+              ]}
+              accessibilityLabel="Åpne verktøy"
+              accessibilityRole="button"
+            >
+              <Palette size={28} color="#FFFFFF" strokeWidth={2} />
+            </Pressable>
+          </Animated.View>
+        )}
+      </View>
+
+      {/* Lukk-overlay når toolbar er åpen */}
+      {toolbarOpen && (
+        <Pressable
+          style={styles.overlay}
+          onPress={toggleToolbar}
+        />
+      )}
     </View>
   );
 }
@@ -137,9 +220,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.canvas,
   },
-  backButton: {
+  topLeft: {
     position: "absolute",
     left: 16,
     zIndex: 10,
+  },
+  fabContainer: {
+    position: "absolute",
+    right: 16,
+    zIndex: 20,
+    alignItems: "flex-end",
+  },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 15,
   },
 });

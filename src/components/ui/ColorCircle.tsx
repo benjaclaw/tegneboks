@@ -13,13 +13,21 @@ interface ColorCircleProps {
   color: string;
   selected: boolean;
   onPress: () => void;
+  size?: "sm" | "md";
 }
+
+const SIZES = {
+  sm: 36,
+  md: 48,
+} as const;
 
 export const ColorCircle = memo(function ColorCircle({
   color,
   selected,
   onPress,
+  size = "md",
 }: ColorCircleProps) {
+  const dimension = SIZES[size];
   const scale = useSharedValue(selected ? 1.2 : 1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -58,26 +66,20 @@ export const ColorCircle = memo(function ColorCircle({
       accessibilityRole="button"
       style={[
         animatedStyle,
-        styles.circle,
         {
+          width: dimension,
+          height: dimension,
+          borderRadius: 9999,
           backgroundColor: color,
+          borderWidth: size === "sm" ? 2 : 3,
           borderColor: selected ? "#2C2C2C" : "#FFFFFF",
           shadowColor: selected ? color : "transparent",
+          shadowOffset: { width: 0, height: 2 },
           shadowOpacity: selected ? 0.4 : 0,
+          shadowRadius: 6,
           elevation: selected ? 4 : 0,
         },
       ]}
     />
   );
-});
-
-const styles = StyleSheet.create({
-  circle: {
-    width: 48,
-    height: 48,
-    borderRadius: 9999,
-    borderWidth: 3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-  },
 });

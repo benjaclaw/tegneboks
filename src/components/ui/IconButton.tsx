@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -15,11 +15,17 @@ interface IconButtonProps {
   icon: LucideIcon;
   onPress: () => void;
   selected?: boolean;
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
   iconColor?: string;
   backgroundColor?: string;
   accessibilityLabel: string;
 }
+
+const SIZE_MAP = {
+  sm: { dimensions: 44, iconSize: 22 },
+  md: { dimensions: 60, iconSize: 28 },
+  lg: { dimensions: 72, iconSize: 36 },
+} as const;
 
 export function IconButton({
   icon: Icon,
@@ -32,8 +38,7 @@ export function IconButton({
 }: IconButtonProps) {
   const scale = useSharedValue(1);
 
-  const dimensions = size === "lg" ? 72 : 60;
-  const iconSize = size === "lg" ? 36 : 28;
+  const { dimensions, iconSize } = SIZE_MAP[size];
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

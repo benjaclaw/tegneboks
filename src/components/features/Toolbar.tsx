@@ -23,6 +23,7 @@ interface ToolbarProps {
   onSave: () => void;
   isEraser: boolean;
   onToggleEraser: () => void;
+  bottomInset?: number;
 }
 
 function StrokeSizeButton({
@@ -52,7 +53,7 @@ function StrokeSizeButton({
     });
   }, [selected, scale]);
 
-  const dotSize = size === penSizes.thin ? 8 : size === penSizes.medium ? 14 : 22;
+  const dotSize = size === penSizes.thin ? 6 : size === penSizes.medium ? 12 : 20;
 
   return (
     <AnimatedPressable
@@ -91,9 +92,10 @@ export const Toolbar = memo(function Toolbar({
   onSave,
   isEraser,
   onToggleEraser,
+  bottomInset = 0,
 }: ToolbarProps) {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { marginBottom: 8 }]}>
       {/* Fargevelger */}
       <ScrollView
         horizontal
@@ -107,13 +109,13 @@ export const Toolbar = memo(function Toolbar({
             color={c}
             selected={!isEraser && selectedColor === c}
             onPress={() => onColorChange(c)}
+            size="sm"
           />
         ))}
       </ScrollView>
 
       {/* Verktøy-rad */}
       <View style={styles.toolRow}>
-        {/* Penntykkelse */}
         {[penSizes.thin, penSizes.medium, penSizes.thick].map((size) => (
           <StrokeSizeButton
             key={size}
@@ -123,31 +125,31 @@ export const Toolbar = memo(function Toolbar({
           />
         ))}
 
-        {/* Separator */}
         <View style={styles.separator} />
 
         <IconButton
           icon={Eraser}
           onPress={onToggleEraser}
           selected={isEraser}
+          size="sm"
           accessibilityLabel="Viskelær"
         />
-
         <IconButton
           icon={Undo2}
           onPress={onUndo}
+          size="sm"
           accessibilityLabel="Angre"
         />
-
         <IconButton
           icon={Plus}
           onPress={onClear}
+          size="sm"
           accessibilityLabel="Ny tegning"
         />
-
         <IconButton
           icon={Download}
           onPress={onSave}
+          size="sm"
           backgroundColor={colors.primary}
           iconColor="#FFFFFF"
           accessibilityLabel="Lagre tegning"
@@ -159,36 +161,40 @@ export const Toolbar = memo(function Toolbar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.toolbar,
-    borderTopWidth: 2,
-    borderTopColor: colors.border,
-    paddingBottom: 24,
-    paddingTop: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    maxWidth: 360,
   },
   colorScroll: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   colorScrollContent: {
-    paddingHorizontal: 16,
-    gap: 10,
+    paddingHorizontal: 12,
+    gap: 8,
     alignItems: "center",
   },
   toolRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
+    gap: 8,
+    paddingHorizontal: 12,
   },
   separator: {
-    width: 2,
-    height: 40,
+    width: 1,
+    height: 28,
     backgroundColor: colors.border,
-    marginHorizontal: 4,
+    marginHorizontal: 2,
   },
   strokeButton: {
-    width: 60,
-    height: 60,
+    width: 44,
+    height: 44,
     borderRadius: 9999,
     borderWidth: 2,
     alignItems: "center",

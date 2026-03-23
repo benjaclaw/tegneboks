@@ -28,6 +28,7 @@ export interface DrawingCanvasRef {
 interface DrawingCanvasProps {
   color: string;
   strokeWidth: number;
+  onPathsChange?: () => void;
 }
 
 // Maks antall paths før vi flattener til én sammenslått path
@@ -35,7 +36,7 @@ interface DrawingCanvasProps {
 const MAX_PATHS_BEFORE_FLATTEN = 100;
 
 export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  function DrawingCanvas({ color, strokeWidth }, ref) {
+  function DrawingCanvas({ color, strokeWidth, onPathsChange }, ref) {
     const [paths, setPaths] = useState<PathData[]>([]);
     const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
     const currentColorRef = useRef(color);
@@ -125,7 +126,8 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                       },
                     ];
 
-                    // Advarsel ved mange paths — fremtidig optimalisering
+                    onPathsChange?.();
+
                     if (next.length > MAX_PATHS_BEFORE_FLATTEN) {
                       console.warn(
                         `Drawing has ${next.length} paths — may impact performance`

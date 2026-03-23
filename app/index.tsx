@@ -1,5 +1,5 @@
 import { useCallback, useState, useMemo } from "react";
-import { View, FlatList, Pressable, Dimensions, Alert, StyleSheet } from "react-native";
+import { View, FlatList, Pressable, Dimensions, Alert, StyleSheet, Text } from "react-native";
 import { useFocusEffect, router } from "expo-router";
 import { Plus, Pencil } from "lucide-react-native";
 import Animated, {
@@ -51,9 +51,8 @@ function NewDrawingButton({ onPress }: { onPress: () => void }) {
       accessibilityRole="button"
       style={[animatedStyle, styles.newDrawingButton]}
     >
-      <View style={styles.gradientBase} />
-      <View style={styles.gradientOverlay} />
-      <Plus size={36} color="#FFFFFF" strokeWidth={2.5} />
+      <Plus size={28} color="#FFFFFF" strokeWidth={2.5} />
+      <Text style={styles.newDrawingText}>Ny tegning</Text>
     </AnimatedPressable>
   );
 }
@@ -166,37 +165,25 @@ const styles = StyleSheet.create({
     gap: GRID_GAP,
   },
   newDrawingButton: {
-    height: 80,
-    borderRadius: 20,
+    height: 64,
+    borderRadius: 16,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
     marginHorizontal: GRID_PADDING,
     marginBottom: GRID_GAP,
+    backgroundColor: colors.primary,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 16,
+    shadowRadius: 12,
     elevation: 6,
-    overflow: "hidden",
   },
-  gradientBase: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: colors.primary,
-  },
-  gradientOverlay: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: "60%",
-    backgroundColor: colors.secondary,
-    opacity: 0.6,
-    borderTopLeftRadius: 100,
-    borderBottomLeftRadius: 100,
+  newDrawingText: {
+    fontFamily: "Nunito_700Bold",
+    fontSize: 18,
+    color: "#FFFFFF",
   },
   emptyState: {
     alignItems: "center",
