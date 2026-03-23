@@ -1,4 +1,5 @@
-import { Pressable } from "react-native";
+import { useCallback } from "react";
+import { Pressable, StyleSheet } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -38,18 +39,18 @@ export function IconButton({
     transform: [{ scale: scale.value }],
   }));
 
-  const handlePressIn = () => {
+  const handlePressIn = useCallback(() => {
     scale.value = withSpring(0.92, { damping: 15, stiffness: 300 });
-  };
+  }, [scale]);
 
-  const handlePressOut = () => {
+  const handlePressOut = useCallback(() => {
     scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
+  }, [scale]);
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
-  };
+  }, [onPress]);
 
   const bg = backgroundColor ?? (selected ? colors.primary : colors.surface);
   const ic = iconColor ?? (selected ? "#FFFFFF" : colors.text);

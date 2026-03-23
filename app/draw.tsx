@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { View, Alert } from "react-native";
+import { useRef, useState, useCallback } from "react";
+import { View, Alert, StyleSheet } from "react-native";
 import { router } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,27 +24,39 @@ export default function DrawScreen() {
 
   const activeColor = isEraser ? "#FFFFFF" : selectedColor;
 
-  const handleColorChange = (color: string) => {
+  const handleColorChange = useCallback((color: string) => {
     setSelectedColor(color);
     setIsEraser(false);
-  };
+  }, []);
 
-  const handleToggleEraser = () => {
+  const handleToggleEraser = useCallback(() => {
     setIsEraser((prev) => !prev);
-  };
+  }, []);
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     canvasRef.current?.undo();
-  };
+  }, []);
 
-  const handleClear = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    canvasRef.current?.clear();
-  };
+  const handleClear = useCallback(() => {
+    Alert.alert(
+      "Ny tegning",
+      "Er du sikker? Alt du har tegnet blir borte.",
+      [
+        { text: "Avbryt", style: "cancel" },
+        {
+          text: "Ja, start på nytt",
+          style: "destructive",
+          onPress: () => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            canvasRef.current?.clear();
+          },
+        },
+      ]
+    );
+  }, []);
 
-  const handleSave = async () => {
-    // Hindre dobbel-lagring ved raske trykk
+  const handleSave = useCallback(async () => {
     if (isSavingRef.current) return;
     isSavingRef.current = true;
 
@@ -71,22 +83,20 @@ export default function DrawScreen() {
     } finally {
       isSavingRef.current = false;
     }
-  };
+  }, []);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     router.back();
-  };
+  }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+    <View style={styles.container}>
       {/* Tilbake-knapp */}
       <View
-        style={{
-          position: "absolute",
-          top: insets.top + 8,
-          left: 16,
-          zIndex: 10,
-        }}
+        style={[
+          styles.backButton,
+          { top: insets.top + 8 },
+        ]}
       >
         <IconButton
           icon={ArrowLeft}
@@ -117,3 +127,15 @@ export default function DrawScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.canvas,
+  },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    zIndex: 10,
+  },
+});

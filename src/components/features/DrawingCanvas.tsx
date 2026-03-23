@@ -1,5 +1,5 @@
-import { useRef, useImperativeHandle, forwardRef, useState, useCallback } from "react";
-import { View } from "react-native";
+import { useRef, useImperativeHandle, forwardRef, useState, useMemo } from "react";
+import { View, StyleSheet } from "react-native";
 import {
   Canvas,
   Path,
@@ -28,17 +28,21 @@ export interface DrawingCanvasRef {
 interface DrawingCanvasProps {
   color: string;
   strokeWidth: number;
-  onPathsChange?: (count: number) => void;
 }
 
+// Maks antall paths før vi flattener til én sammenslått path
+// Hindrer at canvas blir tregere jo mer du tegner
+const MAX_PATHS_BEFORE_FLATTEN = 100;
+
 export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  function DrawingCanvas({ color, strokeWidth, onPathsChange }, ref) {
+  function DrawingCanvas({ color, strokeWidth }, ref) {
     const [paths, setPaths] = useState<PathData[]>([]);
     const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
     const currentColorRef = useRef(color);
     const currentStrokeRef = useRef(strokeWidth);
     const canvasRef = useCanvasRef();
     const pointCountRef = useRef(0);
+    const isDrawingRef = useRef(false);
 
     // Hold refs oppdatert med nåværende verdier
     currentColorRef.current = color;
@@ -46,73 +50,108 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     useImperativeHandle(ref, () => ({
       undo: () => {
-        setPaths((prev) => {
-          const next = prev.slice(0, -1);
-          onPathsChange?.(next.length);
-          return next;
-        });
+        setPaths((prev) => prev.slice(0, -1));
       },
       clear: () => {
         setPaths([]);
         setCurrentPath(null);
-        onPathsChange?.(0);
       },
       getSnapshot: () => {
-        return canvasRef.current?.makeImageSnapshot();
+        try {
+          return canvasRef.current?.makeImageSnapshot();
+        } catch (error) {
+          console.warn("Failed to create snapshot:", error);
+          return undefined;
+        }
       },
     }));
 
-    const panGesture = Gesture.Pan()
-      .runOnJS(true)
-      .minDistance(0)
-      .onBegin((e) => {
-        const path = Skia.Path.Make();
-        path.moveTo(e.x, e.y);
-        pointCountRef.current = 0;
-        setCurrentPath(path);
-      })
-      .onUpdate((e) => {
-        setCurrentPath((prev) => {
-          if (!prev) return null;
-          prev.lineTo(e.x, e.y);
-          pointCountRef.current += 1;
-          // Return a copy every 3 points to trigger re-render without
-          // excessive copies. Skia renders the mutated path even without
-          // copy, but React needs a new reference to schedule a render.
-          if (pointCountRef.current % 3 === 0) {
-            return prev.copy();
-          }
-          return prev;
-        });
-      })
-      .onEnd(() => {
-        setCurrentPath((prev) => {
-          if (prev) {
-            const finishedPath = prev.copy();
-            const pathColor = currentColorRef.current;
-            const pathStroke = currentStrokeRef.current;
+    const panGesture = useMemo(
+      () =>
+        Gesture.Pan()
+          .runOnJS(true)
+          .minDistance(0)
+          .onBegin((e) => {
+            if (isDrawingRef.current) return;
+            isDrawingRef.current = true;
 
-            setPaths((prevPaths) => {
-              const next = [
-                ...prevPaths,
-                {
-                  path: finishedPath,
-                  color: pathColor,
-                  strokeWidth: pathStroke,
-                },
-              ];
-              onPathsChange?.(next.length);
-              return next;
+            try {
+              const path = Skia.Path.Make();
+              path.moveTo(e.x, e.y);
+              pointCountRef.current = 0;
+              setCurrentPath(path);
+            } catch (error) {
+              console.warn("Failed to create path:", error);
+              isDrawingRef.current = false;
+            }
+          })
+          .onUpdate((e) => {
+            if (!isDrawingRef.current) return;
+
+            setCurrentPath((prev) => {
+              if (!prev) return null;
+              try {
+                prev.lineTo(e.x, e.y);
+                pointCountRef.current += 1;
+                // Kopier hver 3. punkt for å trigge re-render
+                // uten å lage for mange kopier
+                if (pointCountRef.current % 3 === 0) {
+                  return prev.copy();
+                }
+                return prev;
+              } catch (error) {
+                console.warn("Failed to update path:", error);
+                return prev;
+              }
             });
-          }
-          return null;
-        });
-      });
+          })
+          .onEnd(() => {
+            isDrawingRef.current = false;
+
+            setCurrentPath((prev) => {
+              if (prev) {
+                try {
+                  const finishedPath = prev.copy();
+                  const pathColor = currentColorRef.current;
+                  const pathStroke = currentStrokeRef.current;
+
+                  setPaths((prevPaths) => {
+                    const next = [
+                      ...prevPaths,
+                      {
+                        path: finishedPath,
+                        color: pathColor,
+                        strokeWidth: pathStroke,
+                      },
+                    ];
+
+                    // Advarsel ved mange paths — fremtidig optimalisering
+                    if (next.length > MAX_PATHS_BEFORE_FLATTEN) {
+                      console.warn(
+                        `Drawing has ${next.length} paths — may impact performance`
+                      );
+                    }
+
+                    return next;
+                  });
+                } catch (error) {
+                  console.warn("Failed to finalize path:", error);
+                }
+              }
+              return null;
+            });
+          })
+          .onFinalize(() => {
+            // Sikkerhetsnett — reset drawing state uansett
+            isDrawingRef.current = false;
+          }),
+      []
+    );
 
     return (
       <GestureDetector gesture={panGesture}>
-        <View style={{ flex: 1, backgroundColor: colors.canvas }}>
-          <Canvas ref={canvasRef} style={{ flex: 1 }}>
+        <View style={styles.container}>
+          <Canvas ref={canvasRef} style={styles.canvas}>
             {paths.map((pathData, index) => (
               <Path
                 key={`path-${index}`}
@@ -140,3 +179,13 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     );
   }
 );
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.canvas,
+  },
+  canvas: {
+    flex: 1,
+  },
+});

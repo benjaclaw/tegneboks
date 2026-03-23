@@ -8,7 +8,7 @@ import {
   Nunito_700Bold,
   Nunito_800ExtraBold,
 } from "@expo-google-fonts/nunito";
-import { View } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as SystemUI from "expo-system-ui";
@@ -17,7 +17,7 @@ import { Pencil } from "lucide-react-native";
 import { colors } from "../src/theme";
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Nunito_600SemiBold,
     Nunito_700Bold,
     Nunito_800ExtraBold,
@@ -27,16 +27,10 @@ export default function RootLayout() {
     void SystemUI.setBackgroundColorAsync(colors.background);
   }, []);
 
-  if (!fontsLoaded) {
+  // Vis appen selv om fonter feiler — bruk systemfont som fallback
+  if (!fontsLoaded && !fontError) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: colors.background,
-        }}
-      >
+      <View style={styles.loadingContainer}>
         <Animated.View entering={FadeIn.duration(600)}>
           <Pencil size={48} color={colors.primary} strokeWidth={2.5} />
         </Animated.View>
@@ -45,7 +39,7 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <StatusBar style="dark" />
         <Stack
@@ -59,3 +53,15 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+  },
+});

@@ -1,4 +1,5 @@
-import { Alert, Image, Pressable } from "react-native";
+import { useCallback, useState } from "react";
+import { Alert, Image, Pressable, View, StyleSheet } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -24,6 +25,7 @@ export function DrawingCard({
 }: DrawingCardProps) {
   const scale = useSharedValue(1);
   const rotation = useSharedValue(0);
+  const [imageError, setImageError] = useState(false);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -32,18 +34,17 @@ export function DrawingCard({
     ],
   }));
 
-  const handlePressIn = () => {
+  const handlePressIn = useCallback(() => {
     scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-  };
+  }, [scale]);
 
-  const handlePressOut = () => {
+  const handlePressOut = useCallback(() => {
     scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
+  }, [scale]);
 
-  const handleLongPress = () => {
+  const handleLongPress = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
-    // Shake-animasjon
     rotation.value = withSequence(
       withTiming(2, { duration: 80 }),
       withTiming(-2, { duration: 80 }),
@@ -60,7 +61,11 @@ export function DrawingCard({
         onPress: onDelete,
       },
     ]);
-  };
+  }, [rotation, onDelete]);
+
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+  }, []);
 
   return (
     <AnimatedPressable
@@ -71,28 +76,43 @@ export function DrawingCard({
       delayLongPress={500}
       accessibilityLabel="Lagret tegning"
       accessibilityRole="button"
-      style={[
-        animatedStyle,
-        {
-          aspectRatio: 1,
-          borderRadius: 20,
-          borderWidth: 2,
-          borderColor: colors.border,
-          backgroundColor: colors.surface,
-          shadowColor: colors.primary,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.15,
-          shadowRadius: 12,
-          elevation: 4,
-          overflow: "hidden",
-        },
-      ]}
+      style={[animatedStyle, styles.card]}
     >
-      <Image
-        source={{ uri: imageUri }}
-        style={{ width: "100%", height: "100%" }}
-        resizeMode="cover"
-      />
+      {imageError ? (
+        <View style={styles.errorPlaceholder} />
+      ) : (
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.image}
+          resizeMode="cover"
+          onError={handleImageError}
+        />
+      )}
     </AnimatedPressable>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    aspectRatio: 1,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+    overflow: "hidden",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  errorPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.background,
+  },
+});

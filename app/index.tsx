@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { View, FlatList, Pressable, Dimensions, Alert } from "react-native";
+import { useCallback, useState, useMemo } from "react";
+import { View, FlatList, Pressable, Dimensions, Alert, StyleSheet } from "react-native";
 import { useFocusEffect, router } from "expo-router";
 import { Plus, Pencil } from "lucide-react-native";
 import Animated, {
@@ -20,10 +20,13 @@ import { colors } from "../src/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GRID_GAP = 16;
 const GRID_PADDING = 16;
-const CARD_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP) / 2;
+
+function getCardWidth(): number {
+  const { width } = Dimensions.get("window");
+  return (width - GRID_PADDING * 2 - GRID_GAP) / 2;
+}
 
 function NewDrawingButton({ onPress }: { onPress: () => void }) {
   const scale = useSharedValue(1);
@@ -46,48 +49,10 @@ function NewDrawingButton({ onPress }: { onPress: () => void }) {
       }}
       accessibilityLabel="Ny tegning"
       accessibilityRole="button"
-      style={[
-        animatedStyle,
-        {
-          height: 80,
-          borderRadius: 20,
-          alignItems: "center",
-          justifyContent: "center",
-          marginHorizontal: GRID_PADDING,
-          marginBottom: GRID_GAP,
-          shadowColor: colors.primary,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 16,
-          elevation: 6,
-          overflow: "hidden",
-        },
-      ]}
+      style={[animatedStyle, styles.newDrawingButton]}
     >
-      {/* Gradient-simulering med to lag */}
-      <View
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 0,
-          backgroundColor: colors.primary,
-        }}
-      />
-      <View
-        style={{
-          position: "absolute",
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: "60%",
-          backgroundColor: colors.secondary,
-          opacity: 0.6,
-          borderTopLeftRadius: 100,
-          borderBottomLeftRadius: 100,
-        }}
-      />
+      <View style={styles.gradientBase} />
+      <View style={styles.gradientOverlay} />
       <Plus size={36} color="#FFFFFF" strokeWidth={2.5} />
     </AnimatedPressable>
   );
@@ -96,19 +61,28 @@ function NewDrawingButton({ onPress }: { onPress: () => void }) {
 export default function HomeScreen() {
   const [drawings, setDrawings] = useState<SavedDrawing[]>([]);
   const insets = useSafeAreaInsets();
+  const cardWidth = useMemo(() => getCardWidth(), []);
 
   useFocusEffect(
     useCallback(() => {
+      let cancelled = false;
+
       getDrawings()
-        .then(setDrawings)
+        .then((data) => {
+          if (!cancelled) setDrawings(data);
+        })
         .catch((error) => {
           console.warn("Failed to load drawings:", error);
-          setDrawings([]);
+          if (!cancelled) setDrawings([]);
         });
+
+      return () => {
+        cancelled = true;
+      };
     }, [])
   );
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     try {
       await deleteDrawing(id);
       setDrawings((prev) => prev.filter((d) => d.id !== id));
@@ -116,58 +90,117 @@ export default function HomeScreen() {
       console.warn("Failed to delete drawing:", error);
       Alert.alert("Feil", "Kunne ikke slette tegningen.");
     }
-  };
+  }, []);
+
+  const handleNewDrawing = useCallback(() => {
+    router.push("/draw");
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: SavedDrawing }) => (
+      <View style={{ width: cardWidth }}>
+        <DrawingCard
+          imageUri={`data:image/png;base64,${item.imageBase64}`}
+          onPress={() => router.push(`/draw?id=${item.id}`)}
+          onDelete={() => void handleDelete(item.id)}
+        />
+      </View>
+    ),
+    [cardWidth, handleDelete]
+  );
+
+  const keyExtractor = useCallback((item: SavedDrawing) => item.id, []);
+
+  const header = useMemo(
+    () => <NewDrawingButton onPress={handleNewDrawing} />,
+    [handleNewDrawing]
+  );
+
+  const emptyComponent = useMemo(
+    () => (
+      <Animated.View entering={FadeIn.duration(500)} style={styles.emptyState}>
+        <Pencil size={64} color={colors.border} strokeWidth={2} />
+      </Animated.View>
+    ),
+    []
+  );
 
   return (
     <View
-      style={{
-        flex: 1,
-        backgroundColor: colors.background,
-        paddingTop: insets.top + 16,
-      }}
+      style={[
+        styles.screen,
+        { paddingTop: insets.top + 16 },
+      ]}
     >
       <FlatList
         data={drawings}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         numColumns={2}
-        columnWrapperStyle={{
-          gap: GRID_GAP,
-          paddingHorizontal: GRID_PADDING,
-        }}
-        contentContainerStyle={{
-          gap: GRID_GAP,
-          paddingBottom: insets.bottom + 16,
-        }}
-        // Begrens hvor mange kort som rendres samtidig
+        columnWrapperStyle={styles.columnWrapper}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: insets.bottom + 16 },
+        ]}
         maxToRenderPerBatch={6}
         windowSize={5}
         removeClippedSubviews={true}
         initialNumToRender={4}
-        ListHeaderComponent={
-          <NewDrawingButton onPress={() => router.push("/draw")} />
-        }
-        ListEmptyComponent={
-          <Animated.View
-            entering={FadeIn.duration(500)}
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingTop: 80,
-            }}
-          >
-            <Pencil size={64} color={colors.border} strokeWidth={2} />
-          </Animated.View>
-        }
-        renderItem={({ item }) => (
-          <View style={{ width: CARD_WIDTH }}>
-            <DrawingCard
-              imageUri={`data:image/png;base64,${item.imageBase64}`}
-              onPress={() => router.push(`/draw?id=${item.id}`)}
-              onDelete={() => void handleDelete(item.id)}
-            />
-          </View>
-        )}
+        ListHeaderComponent={header}
+        ListEmptyComponent={emptyComponent}
+        renderItem={renderItem}
       />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  columnWrapper: {
+    gap: GRID_GAP,
+    paddingHorizontal: GRID_PADDING,
+  },
+  listContent: {
+    gap: GRID_GAP,
+  },
+  newDrawingButton: {
+    height: 80,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: GRID_PADDING,
+    marginBottom: GRID_GAP,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6,
+    overflow: "hidden",
+  },
+  gradientBase: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: colors.primary,
+  },
+  gradientOverlay: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: "60%",
+    backgroundColor: colors.secondary,
+    opacity: 0.6,
+    borderTopLeftRadius: 100,
+    borderBottomLeftRadius: 100,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 80,
+  },
+});
