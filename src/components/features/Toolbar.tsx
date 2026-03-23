@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -51,10 +52,13 @@ function StrokeSizeButton({
     onPress();
   };
 
-  scale.value = withSpring(selected ? 1.15 : 1, {
-    damping: 12,
-    stiffness: 200,
-  });
+  // Flytt scale-oppdatering til useEffect for å unngå render-loop
+  useEffect(() => {
+    scale.value = withSpring(selected ? 1.15 : 1, {
+      damping: 12,
+      stiffness: 200,
+    });
+  }, [selected, scale]);
 
   // Visuell størrelse: tynn=8, medium=14, tykk=22
   const dotSize = size === penSizes.thin ? 8 : size === penSizes.medium ? 14 : 22;

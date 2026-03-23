@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, FlatList, Pressable, Dimensions } from "react-native";
+import { View, FlatList, Pressable, Dimensions, Alert } from "react-native";
 import { useFocusEffect, router } from "expo-router";
 import { Plus, Pencil } from "lucide-react-native";
 import Animated, {
@@ -99,13 +99,23 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void getDrawings().then(setDrawings);
+      getDrawings()
+        .then(setDrawings)
+        .catch((error) => {
+          console.warn("Failed to load drawings:", error);
+          setDrawings([]);
+        });
     }, [])
   );
 
   const handleDelete = async (id: string) => {
-    await deleteDrawing(id);
-    setDrawings((prev) => prev.filter((d) => d.id !== id));
+    try {
+      await deleteDrawing(id);
+      setDrawings((prev) => prev.filter((d) => d.id !== id));
+    } catch (error) {
+      console.warn("Failed to delete drawing:", error);
+      Alert.alert("Feil", "Kunne ikke slette tegningen.");
+    }
   };
 
   return (
@@ -128,6 +138,11 @@ export default function HomeScreen() {
           gap: GRID_GAP,
           paddingBottom: insets.bottom + 16,
         }}
+        // Begrens hvor mange kort som rendres samtidig
+        maxToRenderPerBatch={6}
+        windowSize={5}
+        removeClippedSubviews={true}
+        initialNumToRender={4}
         ListHeaderComponent={
           <NewDrawingButton onPress={() => router.push("/draw")} />
         }

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Pressable } from "react-native";
 import Animated, {
   useSharedValue,
@@ -21,6 +22,14 @@ export function ColorCircle({ color, selected, onPress }: ColorCircleProps) {
     transform: [{ scale: scale.value }],
   }));
 
+  // Oppdater scale når selected endres — i useEffect, ikke render body
+  useEffect(() => {
+    scale.value = withSpring(selected ? 1.2 : 1, {
+      damping: 12,
+      stiffness: 200,
+    });
+  }, [selected, scale]);
+
   const handlePressIn = () => {
     scale.value = withSpring(0.9, { damping: 15, stiffness: 300 });
   };
@@ -36,12 +45,6 @@ export function ColorCircle({ color, selected, onPress }: ColorCircleProps) {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
   };
-
-  // Oppdater scale når selected endres
-  scale.value = withSpring(selected ? 1.2 : 1, {
-    damping: 12,
-    stiffness: 200,
-  });
 
   return (
     <AnimatedPressable

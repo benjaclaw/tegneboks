@@ -1,24 +1,22 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState } from "react";
 import { View, Alert } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
-import { useFocusEffect } from "expo-router";
+import { router } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { Skia } from "@shopify/react-native-skia";
 import {
   DrawingCanvas,
   type DrawingCanvasRef,
 } from "../src/components/features/DrawingCanvas";
 import { Toolbar } from "../src/components/features/Toolbar";
 import { IconButton } from "../src/components/ui/IconButton";
-import { saveDrawing, getDrawingById } from "../src/services/storageService";
+import { saveDrawing } from "../src/services/storageService";
 import { colors, drawingColors, penSizes } from "../src/theme";
 
 export default function DrawScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
   const canvasRef = useRef<DrawingCanvasRef>(null);
   const insets = useSafeAreaInsets();
+  const isSavingRef = useRef(false);
 
   const [selectedColor, setSelectedColor] = useState<string>(drawingColors[0]);
   const [strokeWidth, setStrokeWidth] = useState<number>(penSizes.medium);
@@ -46,13 +44,33 @@ export default function DrawScreen() {
   };
 
   const handleSave = async () => {
-    const snapshot = canvasRef.current?.getSnapshot();
-    if (!snapshot) return;
+    // Hindre dobbel-lagring ved raske trykk
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
 
-    const encoded = snapshot.encodeToBase64();
-    await saveDrawing(encoded);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    try {
+      const snapshot = canvasRef.current?.getSnapshot();
+      if (!snapshot) {
+        isSavingRef.current = false;
+        return;
+      }
+
+      const encoded = snapshot.encodeToBase64();
+      if (!encoded) {
+        Alert.alert("Feil", "Kunne ikke lagre tegningen. Prøv igjen.");
+        isSavingRef.current = false;
+        return;
+      }
+
+      await saveDrawing(encoded);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    } catch (error) {
+      console.warn("Save failed:", error);
+      Alert.alert("Feil", "Kunne ikke lagre tegningen. Prøv igjen.");
+    } finally {
+      isSavingRef.current = false;
+    }
   };
 
   const handleBack = () => {
