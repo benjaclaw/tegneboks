@@ -106,6 +106,24 @@ export async function deleteDrawing(id: string): Promise<void> {
   });
 }
 
+export async function updateDrawing(id: string, imageBase64: string): Promise<void> {
+  await withWriteLock(async () => {
+    const drawings = await getDrawings();
+    const updated = drawings.map((d) =>
+      d.id === id ? { ...d, imageBase64, createdAt: Date.now() } : d
+    );
+
+    let serialized = JSON.stringify({ drawings: updated });
+    // Safeguard
+    while (serialized.length > MAX_STORAGE_BYTES && updated.length > 1) {
+      updated.pop();
+      serialized = JSON.stringify({ drawings: updated });
+    }
+
+    await AsyncStorage.setItem(DRAWINGS_KEY, serialized);
+  });
+}
+
 export async function getDrawingById(
   id: string
 ): Promise<SavedDrawing | undefined> {

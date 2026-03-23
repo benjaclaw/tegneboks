@@ -1,10 +1,12 @@
-import { useRef, useImperativeHandle, forwardRef, useState, useMemo } from "react";
-import { View, StyleSheet, Image } from "react-native";
+import { useRef, useImperativeHandle, forwardRef, useState, useMemo, useEffect } from "react";
+import { View, StyleSheet, LayoutChangeEvent } from "react-native";
 import {
   Canvas,
   Path,
   Skia,
   useCanvasRef,
+  Image as SkiaImage,
+  useImage,
 } from "@shopify/react-native-skia";
 import type { SkPath, SkImage } from "@shopify/react-native-skia";
 import {
@@ -38,14 +40,25 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
   function DrawingCanvas({ color, strokeWidth, onPathsChange, backgroundImage }, ref) {
     const [paths, setPaths] = useState<PathData[]>([]);
     const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
+    const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
     const currentColorRef = useRef(color);
     const currentStrokeRef = useRef(strokeWidth);
     const canvasRef = useCanvasRef();
     const pointCountRef = useRef(0);
     const isDrawingRef = useRef(false);
 
+    // Last bakgrunnsbilde som Skia Image (rendres inne i Canvas → inkluderes i snapshot)
+    const bgImage = useImage(backgroundImage ?? null);
+
     currentColorRef.current = color;
     currentStrokeRef.current = strokeWidth;
+
+    const handleLayout = (e: LayoutChangeEvent) => {
+      setCanvasSize({
+        width: e.nativeEvent.layout.width,
+        height: e.nativeEvent.layout.height,
+      });
+    };
 
     useImperativeHandle(ref, () => ({
       undo: () => {
@@ -134,16 +147,19 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
 
     return (
       <GestureDetector gesture={panGesture}>
-        <View style={styles.container}>
-          {/* Bakgrunnsbilde fra lagret tegning */}
-          {backgroundImage && (
-            <Image
-              source={{ uri: backgroundImage }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="contain"
-            />
-          )}
+        <View style={styles.container} onLayout={handleLayout}>
           <Canvas ref={canvasRef} style={styles.canvas}>
+            {/* Bakgrunnsbilde rendret i Skia → inkluderes i snapshot */}
+            {bgImage && canvasSize.width > 0 && (
+              <SkiaImage
+                image={bgImage}
+                x={0}
+                y={0}
+                width={canvasSize.width}
+                height={canvasSize.height}
+                fit="contain"
+              />
+            )}
             {paths.map((pathData, index) => (
               <Path
                 key={`path-${index}`}

@@ -14,7 +14,7 @@ import {
 } from "../src/components/features/DrawingCanvas";
 import { Toolbar } from "../src/components/features/Toolbar";
 import { IconButton } from "../src/components/ui/IconButton";
-import { saveDrawing, getDrawingById } from "../src/services/storageService";
+import { saveDrawing, updateDrawing, getDrawingById } from "../src/services/storageService";
 import { colors, drawingColors, penSizes } from "../src/theme";
 
 export default function DrawScreen() {
@@ -103,7 +103,12 @@ export default function DrawScreen() {
           return;
         }
 
-        await saveDrawing(encoded);
+        // Oppdater eksisterende tegning eller lagre ny
+        if (id) {
+          await updateDrawing(id, encoded);
+        } else {
+          await saveDrawing(encoded);
+        }
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
       } catch (error) {
