@@ -1,5 +1,5 @@
 import { useRef, useImperativeHandle, forwardRef, useState, useMemo } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Image } from "react-native";
 import {
   Canvas,
   Path,
@@ -29,14 +29,13 @@ interface DrawingCanvasProps {
   color: string;
   strokeWidth: number;
   onPathsChange?: () => void;
+  backgroundImage?: string; // base64 data URI
 }
 
-// Maks antall paths før vi flattener til én sammenslått path
-// Hindrer at canvas blir tregere jo mer du tegner
 const MAX_PATHS_BEFORE_FLATTEN = 100;
 
 export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  function DrawingCanvas({ color, strokeWidth, onPathsChange }, ref) {
+  function DrawingCanvas({ color, strokeWidth, onPathsChange, backgroundImage }, ref) {
     const [paths, setPaths] = useState<PathData[]>([]);
     const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
     const currentColorRef = useRef(color);
@@ -45,7 +44,6 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const pointCountRef = useRef(0);
     const isDrawingRef = useRef(false);
 
-    // Hold refs oppdatert med nåværende verdier
     currentColorRef.current = color;
     currentStrokeRef.current = strokeWidth;
 
@@ -75,7 +73,6 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           .onBegin((e) => {
             if (isDrawingRef.current) return;
             isDrawingRef.current = true;
-
             try {
               const path = Skia.Path.Make();
               path.moveTo(e.x, e.y);
@@ -88,14 +85,11 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           })
           .onUpdate((e) => {
             if (!isDrawingRef.current) return;
-
             setCurrentPath((prev) => {
               if (!prev) return null;
               try {
                 prev.lineTo(e.x, e.y);
                 pointCountRef.current += 1;
-                // Kopier hver 3. punkt for å trigge re-render
-                // uten å lage for mange kopier
                 if (pointCountRef.current % 3 === 0) {
                   return prev.copy();
                 }
@@ -108,32 +102,21 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           })
           .onEnd(() => {
             isDrawingRef.current = false;
-
             setCurrentPath((prev) => {
               if (prev) {
                 try {
                   const finishedPath = prev.copy();
                   const pathColor = currentColorRef.current;
                   const pathStroke = currentStrokeRef.current;
-
                   setPaths((prevPaths) => {
                     const next = [
                       ...prevPaths,
-                      {
-                        path: finishedPath,
-                        color: pathColor,
-                        strokeWidth: pathStroke,
-                      },
+                      { path: finishedPath, color: pathColor, strokeWidth: pathStroke },
                     ];
-
                     onPathsChange?.();
-
                     if (next.length > MAX_PATHS_BEFORE_FLATTEN) {
-                      console.warn(
-                        `Drawing has ${next.length} paths — may impact performance`
-                      );
+                      console.warn(`Drawing has ${next.length} paths`);
                     }
-
                     return next;
                   });
                 } catch (error) {
@@ -144,7 +127,6 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             });
           })
           .onFinalize(() => {
-            // Sikkerhetsnett — reset drawing state uansett
             isDrawingRef.current = false;
           }),
       []
@@ -153,6 +135,14 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     return (
       <GestureDetector gesture={panGesture}>
         <View style={styles.container}>
+          {/* Bakgrunnsbilde fra lagret tegning */}
+          {backgroundImage && (
+            <Image
+              source={{ uri: backgroundImage }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="contain"
+            />
+          )}
           <Canvas ref={canvasRef} style={styles.canvas}>
             {paths.map((pathData, index) => (
               <Path

@@ -1,5 +1,5 @@
-import { useEffect, useCallback, memo } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { useCallback, memo } from "react";
+import { Pressable } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -18,7 +18,7 @@ interface ColorCircleProps {
 
 const SIZES = {
   sm: 36,
-  md: 48,
+  md: 44,
 } as const;
 
 export const ColorCircle = memo(function ColorCircle({
@@ -28,28 +28,18 @@ export const ColorCircle = memo(function ColorCircle({
   size = "md",
 }: ColorCircleProps) {
   const dimension = SIZES[size];
-  const scale = useSharedValue(selected ? 1.2 : 1);
+  const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-
-  useEffect(() => {
-    scale.value = withSpring(selected ? 1.2 : 1, {
-      damping: 12,
-      stiffness: 200,
-    });
-  }, [selected, scale]);
 
   const handlePressIn = useCallback(() => {
     scale.value = withSpring(0.9, { damping: 15, stiffness: 300 });
   }, [scale]);
 
   const handlePressOut = useCallback(() => {
-    scale.value = withSpring(selected ? 1.2 : 1, {
-      damping: 12,
-      stiffness: 200,
-    });
+    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
   }, [selected, scale]);
 
   const handlePress = useCallback(() => {
@@ -71,13 +61,8 @@ export const ColorCircle = memo(function ColorCircle({
           height: dimension,
           borderRadius: 9999,
           backgroundColor: color,
-          borderWidth: size === "sm" ? 2 : 3,
-          borderColor: selected ? "#2C2C2C" : "#FFFFFF",
-          shadowColor: selected ? color : "transparent",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: selected ? 0.4 : 0,
-          shadowRadius: 6,
-          elevation: selected ? 4 : 0,
+          borderWidth: selected ? 3 : 2,
+          borderColor: selected ? "#2C2C2C" : "#E0E0E0",
         },
       ]}
     />

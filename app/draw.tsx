@@ -1,14 +1,10 @@
-import { useRef, useState, useCallback } from "react";
-import { View, Alert, StyleSheet, Pressable, Text } from "react-native";
-import { router } from "expo-router";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { View, Alert, StyleSheet, Pressable } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, Palette } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
   FadeIn,
   FadeOut,
 } from "react-native-reanimated";
@@ -18,10 +14,11 @@ import {
 } from "../src/components/features/DrawingCanvas";
 import { Toolbar } from "../src/components/features/Toolbar";
 import { IconButton } from "../src/components/ui/IconButton";
-import { saveDrawing } from "../src/services/storageService";
+import { saveDrawing, getDrawingById } from "../src/services/storageService";
 import { colors, drawingColors, penSizes } from "../src/theme";
 
 export default function DrawScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const canvasRef = useRef<DrawingCanvasRef>(null);
   const insets = useSafeAreaInsets();
   const isSavingRef = useRef(false);
@@ -31,6 +28,25 @@ export default function DrawScreen() {
   const [strokeWidth, setStrokeWidth] = useState<number>(penSizes.medium);
   const [isEraser, setIsEraser] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
+  const [backgroundImage, setBackgroundImage] = useState<string | undefined>();
+
+  // Last lagret tegning hvis id er gitt
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+
+    getDrawingById(id)
+      .then((drawing) => {
+        if (!cancelled && drawing) {
+          setBackgroundImage(`data:image/png;base64,${drawing.imageBase64}`);
+        }
+      })
+      .catch((error) => {
+        console.warn("Failed to load drawing:", error);
+      });
+
+    return () => { cancelled = true; };
+  }, [id]);
 
   const activeColor = isEraser ? "#FFFFFF" : selectedColor;
 
@@ -60,6 +76,7 @@ export default function DrawScreen() {
           onPress: () => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             canvasRef.current?.clear();
+            setBackgroundImage(undefined);
             hasDrawnRef.current = false;
           },
         },
@@ -101,22 +118,14 @@ export default function DrawScreen() {
   }, []);
 
   const handleBack = useCallback(() => {
-    // Spør om å lagre hvis bruker har tegnet noe
     if (hasDrawnRef.current) {
       Alert.alert(
         "Lagre tegning?",
         "Du har en tegning som ikke er lagret.",
         [
-          {
-            text: "Forkast",
-            style: "destructive",
-            onPress: () => router.back(),
-          },
+          { text: "Forkast", style: "destructive", onPress: () => router.back() },
           { text: "Avbryt", style: "cancel" },
-          {
-            text: "Lagre",
-            onPress: () => handleSave(),
-          },
+          { text: "Lagre", onPress: () => handleSave() },
         ]
       );
     } else {
@@ -136,12 +145,7 @@ export default function DrawScreen() {
   return (
     <View style={styles.container}>
       {/* Tilbake-knapp */}
-      <View
-        style={[
-          styles.topLeft,
-          { top: insets.top + 8 },
-        ]}
-      >
+      <View style={[styles.topLeft, { top: insets.top + 8 }]}>
         <IconButton
           icon={ArrowLeft}
           onPress={handleBack}
@@ -155,20 +159,13 @@ export default function DrawScreen() {
         color={activeColor}
         strokeWidth={strokeWidth}
         onPathsChange={handlePathsChange}
+        backgroundImage={backgroundImage}
       />
 
       {/* FAB for verktøy */}
-      <View
-        style={[
-          styles.fabContainer,
-          { bottom: insets.bottom + 16 },
-        ]}
-      >
+      <View style={[styles.fabContainer, { bottom: insets.bottom + 16 }]}>
         {toolbarOpen && (
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-          >
+          <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
             <Toolbar
               selectedColor={selectedColor}
               selectedStrokeWidth={strokeWidth}
@@ -185,15 +182,12 @@ export default function DrawScreen() {
         )}
 
         {!toolbarOpen && (
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-          >
+          <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
             <Pressable
               onPress={toggleToolbar}
               style={[
                 styles.fab,
-                { backgroundColor: selectedColor === "#FFFFFF" || isEraser ? colors.text : selectedColor },
+                { backgroundColor: isEraser ? colors.text : selectedColor },
               ]}
               accessibilityLabel="Åpne verktøy"
               accessibilityRole="button"
@@ -204,12 +198,8 @@ export default function DrawScreen() {
         )}
       </View>
 
-      {/* Lukk-overlay når toolbar er åpen */}
       {toolbarOpen && (
-        <Pressable
-          style={styles.overlay}
-          onPress={toggleToolbar}
-        />
+        <Pressable style={styles.overlay} onPress={toggleToolbar} />
       )}
     </View>
   );

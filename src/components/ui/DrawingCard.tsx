@@ -4,10 +4,9 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withSequence,
-  withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import { Trash2 } from "lucide-react-native";
 import { colors } from "../../theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -24,14 +23,10 @@ export function DrawingCard({
   onDelete,
 }: DrawingCardProps) {
   const scale = useSharedValue(1);
-  const rotation = useSharedValue(0);
   const [imageError, setImageError] = useState(false);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: scale.value },
-      { rotateZ: `${rotation.value}deg` },
-    ],
+    transform: [{ scale: scale.value }],
   }));
 
   const handlePressIn = useCallback(() => {
@@ -42,26 +37,13 @@ export function DrawingCard({
     scale.value = withSpring(1, { damping: 15, stiffness: 300 });
   }, [scale]);
 
-  const handleLongPress = useCallback(() => {
+  const handleDelete = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-
-    rotation.value = withSequence(
-      withTiming(2, { duration: 80 }),
-      withTiming(-2, { duration: 80 }),
-      withTiming(2, { duration: 80 }),
-      withTiming(-2, { duration: 80 }),
-      withTiming(0, { duration: 80 })
-    );
-
-    Alert.alert("", "Slette denne tegningen?", [
-      { text: "Nei", style: "cancel" },
-      {
-        text: "Ja",
-        style: "destructive",
-        onPress: onDelete,
-      },
+    Alert.alert("Slett tegning", "Er du sikker på at du vil slette denne tegningen?", [
+      { text: "Avbryt", style: "cancel" },
+      { text: "Slett", style: "destructive", onPress: onDelete },
     ]);
-  }, [rotation, onDelete]);
+  }, [onDelete]);
 
   const handleImageError = useCallback(() => {
     setImageError(true);
@@ -72,8 +54,6 @@ export function DrawingCard({
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      onLongPress={handleLongPress}
-      delayLongPress={500}
       accessibilityLabel="Lagret tegning"
       accessibilityRole="button"
       style={[animatedStyle, styles.card]}
@@ -88,6 +68,16 @@ export function DrawingCard({
           onError={handleImageError}
         />
       )}
+      {/* Slett-knapp i hjørnet */}
+      <Pressable
+        onPress={handleDelete}
+        style={styles.deleteButton}
+        accessibilityLabel="Slett tegning"
+        accessibilityRole="button"
+        hitSlop={8}
+      >
+        <Trash2 size={16} color="#FFFFFF" strokeWidth={2} />
+      </Pressable>
     </AnimatedPressable>
   );
 }
@@ -114,5 +104,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: colors.background,
+  },
+  deleteButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
