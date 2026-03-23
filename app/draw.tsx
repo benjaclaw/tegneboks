@@ -28,7 +28,7 @@ export default function DrawScreen() {
   const [strokeWidth, setStrokeWidth] = useState<number>(penSizes.medium);
   const [isEraser, setIsEraser] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
-  const [backgroundImage, setBackgroundImage] = useState<string | undefined>();
+  const [backgroundBase64, setBackgroundBase64] = useState<string | undefined>();
 
   // Last lagret tegning hvis id er gitt
   useEffect(() => {
@@ -38,7 +38,8 @@ export default function DrawScreen() {
     getDrawingById(id)
       .then((drawing) => {
         if (!cancelled && drawing) {
-          setBackgroundImage(`data:image/png;base64,${drawing.imageBase64}`);
+          // Send ren base64 — ikke data URI. Skia dekoder dette direkte.
+          setBackgroundBase64(drawing.imageBase64);
         }
       })
       .catch((error) => {
@@ -76,7 +77,7 @@ export default function DrawScreen() {
           onPress: () => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             canvasRef.current?.clear();
-            setBackgroundImage(undefined);
+            setBackgroundBase64(undefined);
             hasDrawnRef.current = false;
           },
         },
@@ -164,7 +165,7 @@ export default function DrawScreen() {
         color={activeColor}
         strokeWidth={strokeWidth}
         onPathsChange={handlePathsChange}
-        backgroundImage={backgroundImage}
+        backgroundBase64={backgroundBase64}
       />
 
       {/* FAB for verktøy */}

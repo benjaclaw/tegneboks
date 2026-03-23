@@ -6,7 +6,6 @@ import {
   Skia,
   useCanvasRef,
   Image as SkiaImage,
-  useImage,
 } from "@shopify/react-native-skia";
 import type { SkPath, SkImage } from "@shopify/react-native-skia";
 import {
@@ -31,27 +30,50 @@ interface DrawingCanvasProps {
   color: string;
   strokeWidth: number;
   onPathsChange?: () => void;
-  backgroundImage?: string; // base64 data URI
+  backgroundBase64?: string; // ren base64 uten data:image prefix
 }
 
 const MAX_PATHS_BEFORE_FLATTEN = 100;
 
+/**
+ * Dekoder en base64-streng til et Skia SkImage.
+ * useImage() fungerer IKKE med data-URIer på Android.
+ * Må bruke Skia.Data.fromBase64 + MakeImageFromEncoded.
+ */
+function decodeBase64Image(base64: string): SkImage | null {
+  try {
+    const data = Skia.Data.fromBase64(base64);
+    return Skia.Image.MakeImageFromEncoded(data);
+  } catch (error) {
+    console.warn("Failed to decode base64 image:", error);
+    return null;
+  }
+}
+
 export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  function DrawingCanvas({ color, strokeWidth, onPathsChange, backgroundImage }, ref) {
+  function DrawingCanvas({ color, strokeWidth, onPathsChange, backgroundBase64 }, ref) {
     const [paths, setPaths] = useState<PathData[]>([]);
     const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
     const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+    const [bgSkImage, setBgSkImage] = useState<SkImage | null>(null);
     const currentColorRef = useRef(color);
     const currentStrokeRef = useRef(strokeWidth);
     const canvasRef = useCanvasRef();
     const pointCountRef = useRef(0);
     const isDrawingRef = useRef(false);
 
-    // Last bakgrunnsbilde som Skia Image (rendres inne i Canvas → inkluderes i snapshot)
-    const bgImage = useImage(backgroundImage ?? null);
-
     currentColorRef.current = color;
     currentStrokeRef.current = strokeWidth;
+
+    // Dekod bakgrunnsbilde når base64 endres
+    useEffect(() => {
+      if (!backgroundBase64) {
+        setBgSkImage(null);
+        return;
+      }
+      const img = decodeBase64Image(backgroundBase64);
+      setBgSkImage(img);
+    }, [backgroundBase64]);
 
     const handleLayout = (e: LayoutChangeEvent) => {
       setCanvasSize({
@@ -149,10 +171,10 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       <GestureDetector gesture={panGesture}>
         <View style={styles.container} onLayout={handleLayout}>
           <Canvas ref={canvasRef} style={styles.canvas}>
-            {/* Bakgrunnsbilde rendret i Skia → inkluderes i snapshot */}
-            {bgImage && canvasSize.width > 0 && (
+            {/* Bakgrunnsbilde dekoded via Skia — fungerer på Android */}
+            {bgSkImage && canvasSize.width > 0 && (
               <SkiaImage
-                image={bgImage}
+                image={bgSkImage}
                 x={0}
                 y={0}
                 width={canvasSize.width}
