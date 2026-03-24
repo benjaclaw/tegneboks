@@ -99,7 +99,7 @@ export default function HomeScreen() {
     ({ item }: { item: SavedDrawing }) => (
       <View style={{ width: cardWidth }}>
         <DrawingCard
-          imageUri={item.imagePath}
+          imageUri={item.imagePath + "?t=" + (item.updatedAt || item.createdAt)}
           onPress={() => router.push(`/draw?id=${item.id}`)}
           onDelete={() => void handleDelete(item.id)}
         />

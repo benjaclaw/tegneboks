@@ -10,6 +10,7 @@ export interface SavedDrawing {
   /** file:// URI to the PNG image */
   imagePath: string;
   createdAt: number;
+  updatedAt: number;
 }
 
 /** Legacy format — only used during migration */
@@ -49,7 +50,9 @@ function isValidMetadataList(data: unknown): data is StoredMetadataList {
       typeof d === "object" &&
       typeof (d as Record<string, unknown>).id === "string" &&
       typeof (d as Record<string, unknown>).imagePath === "string" &&
-      typeof (d as Record<string, unknown>).createdAt === "number"
+      typeof (d as Record<string, unknown>).createdAt === "number" &&
+      (typeof (d as Record<string, unknown>).updatedAt === "number" ||
+        typeof (d as Record<string, unknown>).updatedAt === "undefined")
   );
 }
 
@@ -118,6 +121,7 @@ async function migrateIfNeeded(): Promise<void> {
           id: legacy.id,
           imagePath: file.uri,
           createdAt: legacy.createdAt,
+          updatedAt: legacy.createdAt,
         });
       } catch (error) {
         console.warn(`Failed to migrate drawing ${legacy.id}:`, error);
@@ -167,10 +171,12 @@ export async function saveDrawing(imageBase64: string): Promise<SavedDrawing> {
   file.create({ intermediates: true, overwrite: true });
   file.write(imageBase64, { encoding: "base64" });
 
+  const now = Date.now();
   const drawing: SavedDrawing = {
     id,
     imagePath: file.uri,
-    createdAt: Date.now(),
+    createdAt: now,
+    updatedAt: now,
   };
 
   await withWriteLock(async () => {
@@ -209,7 +215,7 @@ export async function updateDrawing(id: string, imageBase64: string): Promise<vo
       file.create({ intermediates: true, overwrite: true });
       file.write(imageBase64, { encoding: "base64" });
       const updated = drawings.map((d) =>
-        d.id === id ? { ...d, createdAt: Date.now() } : d
+        d.id === id ? { ...d, updatedAt: Date.now() } : d
       );
       await AsyncStorage.setItem(
         DRAWINGS_KEY,
@@ -221,7 +227,8 @@ export async function updateDrawing(id: string, imageBase64: string): Promise<vo
       const file = getDrawingFile(id);
       file.create({ intermediates: true, overwrite: true });
       file.write(imageBase64, { encoding: "base64" });
-      drawings.unshift({ id, imagePath: file.uri, createdAt: Date.now() });
+      const now = Date.now();
+      drawings.unshift({ id, imagePath: file.uri, createdAt: now, updatedAt: now });
       await AsyncStorage.setItem(
         DRAWINGS_KEY,
         JSON.stringify({ drawings } satisfies StoredMetadataList)

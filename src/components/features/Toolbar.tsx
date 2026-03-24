@@ -1,5 +1,5 @@
 import { useEffect, useCallback, memo } from "react";
-import { View, ScrollView, Pressable, StyleSheet } from "react-native";
+import { View, ScrollView, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -94,6 +94,74 @@ export const Toolbar = memo(function Toolbar({
   onToggleEraser,
   bottomInset = 0,
 }: ToolbarProps) {
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
+  const colorCircles = drawingColors.map((c) => (
+    <ColorCircle
+      key={c}
+      color={c}
+      selected={!isEraser && selectedColor === c}
+      onPress={() => onColorChange(c)}
+      size="sm"
+    />
+  ));
+
+  const tools = (
+    <>
+      {[penSizes.thin, penSizes.medium, penSizes.thick].map((size) => (
+        <StrokeSizeButton
+          key={size}
+          size={size}
+          selected={selectedStrokeWidth === size}
+          onPress={() => onStrokeWidthChange(size)}
+        />
+      ))}
+
+      <View style={isLandscape ? styles.separatorLandscape : styles.separator} />
+
+      <IconButton
+        icon={Eraser}
+        onPress={onToggleEraser}
+        selected={isEraser}
+        size="sm"
+        accessibilityLabel="Viskelær"
+      />
+      <IconButton
+        icon={Undo2}
+        onPress={onUndo}
+        size="sm"
+        accessibilityLabel="Angre"
+      />
+      <IconButton
+        icon={Plus}
+        onPress={onClear}
+        size="sm"
+        accessibilityLabel="Ny tegning"
+      />
+      <IconButton
+        icon={Download}
+        onPress={onSave}
+        size="sm"
+        backgroundColor={colors.primary}
+        iconColor="#FFFFFF"
+        accessibilityLabel="Lagre tegning"
+      />
+    </>
+  );
+
+  if (isLandscape) {
+    return (
+      <View style={[styles.container, styles.landscapeContainer, { marginBottom: 8 }]}>
+        <View style={styles.landscapeRow}>
+          {colorCircles}
+          <View style={styles.separatorLandscape} />
+          {tools}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { marginBottom: 8 }]}>
       {/* Fargevelger */}
@@ -103,57 +171,12 @@ export const Toolbar = memo(function Toolbar({
         contentContainerStyle={styles.colorScrollContent}
         style={styles.colorScroll}
       >
-        {drawingColors.map((c) => (
-          <ColorCircle
-            key={c}
-            color={c}
-            selected={!isEraser && selectedColor === c}
-            onPress={() => onColorChange(c)}
-            size="sm"
-          />
-        ))}
+        {colorCircles}
       </ScrollView>
 
       {/* Verktøy-rad */}
       <View style={styles.toolRow}>
-        {[penSizes.thin, penSizes.medium, penSizes.thick].map((size) => (
-          <StrokeSizeButton
-            key={size}
-            size={size}
-            selected={selectedStrokeWidth === size}
-            onPress={() => onStrokeWidthChange(size)}
-          />
-        ))}
-
-        <View style={styles.separator} />
-
-        <IconButton
-          icon={Eraser}
-          onPress={onToggleEraser}
-          selected={isEraser}
-          size="sm"
-          accessibilityLabel="Viskelær"
-        />
-        <IconButton
-          icon={Undo2}
-          onPress={onUndo}
-          size="sm"
-          accessibilityLabel="Angre"
-        />
-        <IconButton
-          icon={Plus}
-          onPress={onClear}
-          size="sm"
-          accessibilityLabel="Ny tegning"
-        />
-        <IconButton
-          icon={Download}
-          onPress={onSave}
-          size="sm"
-          backgroundColor={colors.primary}
-          iconColor="#FFFFFF"
-          accessibilityLabel="Lagre tegning"
-        />
+        {tools}
       </View>
     </View>
   );
@@ -170,6 +193,21 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     maxWidth: 360,
+  },
+  landscapeContainer: {
+    maxWidth: 520,
+    paddingHorizontal: 12,
+  },
+  landscapeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  separatorLandscape: {
+    width: 1,
+    height: 28,
+    backgroundColor: colors.border,
+    marginHorizontal: 4,
   },
   colorScroll: {
     marginBottom: 10,
