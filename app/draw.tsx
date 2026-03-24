@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { View, Alert, StyleSheet, Pressable } from "react-native";
+import { View, Alert, StyleSheet, Pressable, Modal, Text, FlatList, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { ArrowLeft, Palette } from "lucide-react-native";
+import { ArrowLeft, Palette, Shapes, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -16,6 +16,7 @@ import { ErrorBoundary } from "../src/components/features/ErrorBoundary";
 import { Toolbar } from "../src/components/features/Toolbar";
 import { IconButton } from "../src/components/ui/IconButton";
 import { saveDrawing, updateDrawing, getDrawingById } from "../src/services/storageService";
+import { getTemplates, renderTemplateToBase64, type Template } from "../src/services/templateService";
 import { colors, drawingColors, penSizes } from "../src/theme";
 
 export default function DrawScreen() {
@@ -24,12 +25,15 @@ export default function DrawScreen() {
   const insets = useSafeAreaInsets();
   const isSavingRef = useRef(false);
   const hasDrawnRef = useRef(false);
+  const { width: windowWidth } = useWindowDimensions();
 
   const [selectedColor, setSelectedColor] = useState<string>(drawingColors[0]);
   const [strokeWidth, setStrokeWidth] = useState<number>(penSizes.medium);
   const [isEraser, setIsEraser] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [backgroundUri, setBackgroundUri] = useState<string | undefined>();
+  const [templateBase64, setTemplateBase64] = useState<string | undefined>();
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // Last lagret tegning hvis id er gitt
   useEffect(() => {
@@ -78,6 +82,7 @@ export default function DrawScreen() {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             canvasRef.current?.clear();
             setBackgroundUri(undefined);
+            setTemplateBase64(undefined);
             hasDrawnRef.current = false;
           },
         },
@@ -148,6 +153,20 @@ export default function DrawScreen() {
     setToolbarOpen((prev) => !prev);
   }, []);
 
+  const handleSelectTemplate = useCallback((template: Template) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const base64 = renderTemplateToBase64(template, 800, 1200);
+    setTemplateBase64(base64);
+    setBackgroundUri(undefined);
+    canvasRef.current?.clear();
+    hasDrawnRef.current = false;
+    setShowTemplates(false);
+  }, []);
+
+  const templates = getTemplates();
+  const templateColumns = 3;
+  const templateItemWidth = (windowWidth - 80) / templateColumns;
+
   return (
     <View style={styles.container}>
       {/* Tilbake-knapp */}
@@ -159,6 +178,18 @@ export default function DrawScreen() {
         />
       </View>
 
+      {/* Maler-knapp */}
+      <View style={[styles.topRight, { top: insets.top + 8 }]}>
+        <IconButton
+          icon={Shapes}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowTemplates(true);
+          }}
+          accessibilityLabel="Maler"
+        />
+      </View>
+
       {/* Tegneflate */}
       <ErrorBoundary onReset={() => router.back()}>
         <DrawingCanvas
@@ -167,6 +198,7 @@ export default function DrawScreen() {
           strokeWidth={strokeWidth}
           onPathsChange={handlePathsChange}
           backgroundUri={backgroundUri}
+          backgroundBase64={templateBase64}
         />
       </ErrorBoundary>
 
@@ -209,6 +241,54 @@ export default function DrawScreen() {
       {toolbarOpen && (
         <Pressable style={styles.overlay} onPress={toggleToolbar} />
       )}
+
+      {/* Mal-velger modal */}
+      <Modal
+        visible={showTemplates}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowTemplates(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Velg en mal</Text>
+              <IconButton
+                icon={X}
+                onPress={() => setShowTemplates(false)}
+                size="sm"
+                accessibilityLabel="Lukk"
+              />
+            </View>
+            <FlatList
+              data={templates}
+              numColumns={templateColumns}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.templateGrid}
+              columnWrapperStyle={styles.templateRow}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => handleSelectTemplate(item)}
+                  style={[styles.templateItem, { width: templateItemWidth }]}
+                  accessibilityLabel={`Mal: ${item.name}`}
+                  accessibilityRole="button"
+                >
+                  <View style={[styles.templatePreview, { height: templateItemWidth * 1.2 }]}>
+                    <Text style={styles.templateEmoji}>
+                      {item.id === "house" ? "\u{1F3E0}" :
+                       item.id === "flower" ? "\u{1F33B}" :
+                       item.id === "car" ? "\u{1F697}" :
+                       item.id === "butterfly" ? "\u{1F98B}" :
+                       "\u{2B50}"}
+                    </Text>
+                  </View>
+                  <Text style={styles.templateName}>{item.name}</Text>
+                </Pressable>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -221,6 +301,11 @@ const styles = StyleSheet.create({
   topLeft: {
     position: "absolute",
     left: 16,
+    zIndex: 10,
+  },
+  topRight: {
+    position: "absolute",
+    right: 16,
     zIndex: 10,
   },
   fabContainer: {
@@ -244,5 +329,57 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 15,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 16,
+    maxHeight: "60%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  templateGrid: {
+    paddingHorizontal: 20,
+  },
+  templateRow: {
+    gap: 12,
+    marginBottom: 12,
+  },
+  templateItem: {
+    alignItems: "center",
+  },
+  templatePreview: {
+    width: "100%",
+    borderRadius: 16,
+    backgroundColor: colors.background,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  templateEmoji: {
+    fontSize: 40,
+  },
+  templateName: {
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text,
   },
 });

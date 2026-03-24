@@ -32,6 +32,7 @@ interface DrawingCanvasProps {
   strokeWidth: number;
   onPathsChange?: () => void;
   backgroundUri?: string; // file path to PNG background
+  backgroundBase64?: string; // base64 PNG background (e.g. from template)
 }
 
 const MAX_PATHS_BEFORE_FLATTEN = 100;
@@ -50,7 +51,7 @@ function decodeBase64Image(base64: string): SkImage | null {
 }
 
 export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  function DrawingCanvas({ color, strokeWidth, onPathsChange, backgroundUri }, ref) {
+  function DrawingCanvas({ color, strokeWidth, onPathsChange, backgroundUri, backgroundBase64 }, ref) {
     const [paths, setPaths] = useState<PathData[]>([]);
     const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
     const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -64,10 +65,17 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     currentColorRef.current = color;
     currentStrokeRef.current = strokeWidth;
 
+    // Last bakgrunnsbilde fra base64 (f.eks. mal)
+    useEffect(() => {
+      if (!backgroundBase64) return;
+      const img = decodeBase64Image(backgroundBase64);
+      setBgSkImage(img);
+    }, [backgroundBase64]);
+
     // Last bakgrunnsbilde fra fil
     useEffect(() => {
       if (!backgroundUri) {
-        setBgSkImage(null);
+        if (!backgroundBase64) setBgSkImage(null);
         return;
       }
 
