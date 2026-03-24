@@ -16,6 +16,7 @@ import { ErrorBoundary } from "../src/components/features/ErrorBoundary";
 import { Toolbar } from "../src/components/features/Toolbar";
 import { IconButton } from "../src/components/ui/IconButton";
 import { saveDrawing, updateDrawing, getDrawingById } from "../src/services/storageService";
+import { saveToCameraRoll, shareDrawing } from "../src/services/exportService";
 import { getTemplates, renderTemplateToBase64, type Template } from "../src/services/templateService";
 import { colors, drawingColors, penSizes } from "../src/theme";
 
@@ -128,6 +129,39 @@ export default function DrawScreen() {
     void doSave();
   }, []);
 
+  const handleShare = useCallback(() => {
+    const snapshot = canvasRef.current?.getSnapshot();
+    if (!snapshot) return;
+    const encoded = snapshot.encodeToBase64();
+    if (!encoded) return;
+
+    void shareDrawing(encoded)
+      .then(() => {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      })
+      .catch((error) => {
+        console.warn("Share failed:", error);
+        Alert.alert("Feil", "Kunne ikke dele tegningen.");
+      });
+  }, []);
+
+  const handleSaveToCameraRoll = useCallback(() => {
+    const snapshot = canvasRef.current?.getSnapshot();
+    if (!snapshot) return;
+    const encoded = snapshot.encodeToBase64();
+    if (!encoded) return;
+
+    void saveToCameraRoll(encoded)
+      .then(() => {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert("Lagret!", "Tegningen er lagret i kamerarullen.");
+      })
+      .catch((error) => {
+        console.warn("Save to camera roll failed:", error);
+        Alert.alert("Feil", String(error?.message ?? "Kunne ikke lagre til kamerarullen."));
+      });
+  }, []);
+
   const handleBack = useCallback(() => {
     if (hasDrawnRef.current) {
       Alert.alert(
@@ -214,6 +248,8 @@ export default function DrawScreen() {
               onUndo={handleUndo}
               onClear={handleClear}
               onSave={handleSave}
+              onShare={handleShare}
+              onSaveToCameraRoll={handleSaveToCameraRoll}
               isEraser={isEraser}
               onToggleEraser={handleToggleEraser}
               bottomInset={insets.bottom}

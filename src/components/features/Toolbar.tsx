@@ -6,7 +6,7 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Undo2, Eraser, Plus, Download } from "lucide-react-native";
+import { Undo2, Eraser, Plus, Download, Share2, ImageDown } from "lucide-react-native";
 import { IconButton } from "../ui/IconButton";
 import { ColorCircle } from "../ui/ColorCircle";
 import { colors, colorGroups, penSizes } from "../../theme";
@@ -21,6 +21,8 @@ interface ToolbarProps {
   onUndo: () => void;
   onClear: () => void;
   onSave: () => void;
+  onShare: () => void;
+  onSaveToCameraRoll: () => void;
   isEraser: boolean;
   onToggleEraser: () => void;
   bottomInset?: number;
@@ -132,6 +134,8 @@ export const Toolbar = memo(function Toolbar({
   onUndo,
   onClear,
   onSave,
+  onShare,
+  onSaveToCameraRoll,
   isEraser,
   onToggleEraser,
   bottomInset = 0,
@@ -201,6 +205,18 @@ export const Toolbar = memo(function Toolbar({
         backgroundColor={colors.primary}
         iconColor="#FFFFFF"
         accessibilityLabel="Lagre tegning"
+      />
+      <IconButton
+        icon={Share2}
+        onPress={onShare}
+        size="sm"
+        accessibilityLabel="Del tegning"
+      />
+      <IconButton
+        icon={ImageDown}
+        onPress={onSaveToCameraRoll}
+        size="sm"
+        accessibilityLabel="Lagre til kamerarull"
       />
     </>
   );

@@ -34,7 +34,8 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "./plugins/withAndroidSigning"
+      "./plugins/withAndroidSigning",
+      "expo-sharing"
     ],
     "extra": {
       "router": {},
