@@ -12,6 +12,7 @@ import {
   Gesture,
   GestureDetector,
 } from "react-native-gesture-handler";
+import { File as ExpoFile } from "expo-file-system";
 import { colors } from "../../theme";
 
 interface PathData {
@@ -30,15 +31,13 @@ interface DrawingCanvasProps {
   color: string;
   strokeWidth: number;
   onPathsChange?: () => void;
-  backgroundBase64?: string; // ren base64 uten data:image prefix
+  backgroundUri?: string; // file path to PNG background
 }
 
 const MAX_PATHS_BEFORE_FLATTEN = 100;
 
 /**
  * Dekoder en base64-streng til et Skia SkImage.
- * useImage() fungerer IKKE med data-URIer på Android.
- * Må bruke Skia.Data.fromBase64 + MakeImageFromEncoded.
  */
 function decodeBase64Image(base64: string): SkImage | null {
   try {
@@ -51,7 +50,7 @@ function decodeBase64Image(base64: string): SkImage | null {
 }
 
 export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
-  function DrawingCanvas({ color, strokeWidth, onPathsChange, backgroundBase64 }, ref) {
+  function DrawingCanvas({ color, strokeWidth, onPathsChange, backgroundUri }, ref) {
     const [paths, setPaths] = useState<PathData[]>([]);
     const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
     const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -65,15 +64,32 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     currentColorRef.current = color;
     currentStrokeRef.current = strokeWidth;
 
-    // Dekod bakgrunnsbilde når base64 endres
+    // Last bakgrunnsbilde fra fil
     useEffect(() => {
-      if (!backgroundBase64) {
+      if (!backgroundUri) {
         setBgSkImage(null);
         return;
       }
-      const img = decodeBase64Image(backgroundBase64);
-      setBgSkImage(img);
-    }, [backgroundBase64]);
+
+      let cancelled = false;
+
+      (async () => {
+        try {
+          const file = new ExpoFile(backgroundUri);
+          const base64 = await file.base64();
+          if (!cancelled) {
+            const img = decodeBase64Image(base64);
+            setBgSkImage(img);
+          }
+        } catch (error) {
+          console.warn("Failed to load background image:", error);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [backgroundUri]);
 
     const handleLayout = (e: LayoutChangeEvent) => {
       setCanvasSize({
@@ -82,11 +98,35 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       });
     };
 
+    /** Flatten all paths into a background image to prevent performance degradation */
+    const flattenPaths = () => {
+      try {
+        const snapshot = canvasRef.current?.makeImageSnapshot();
+        if (snapshot) {
+          for (const p of paths) {
+            try { p.path.reset(); } catch { /* ignore */ }
+          }
+          setPaths([]);
+          setBgSkImage(snapshot);
+        }
+      } catch (error) {
+        console.warn("Failed to flatten paths:", error);
+      }
+    };
+
     useImperativeHandle(ref, () => ({
       undo: () => {
-        setPaths((prev) => prev.slice(0, -1));
+        setPaths((prev) => {
+          if (prev.length === 0) return prev;
+          const removed = prev[prev.length - 1];
+          try { removed.path.reset(); } catch { /* ignore */ }
+          return prev.slice(0, -1);
+        });
       },
       clear: () => {
+        for (const p of paths) {
+          try { p.path.reset(); } catch { /* ignore */ }
+        }
         setPaths([]);
         setCurrentPath(null);
       },
@@ -126,7 +166,9 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                 prev.lineTo(e.x, e.y);
                 pointCountRef.current += 1;
                 if (pointCountRef.current % 3 === 0) {
-                  return prev.copy();
+                  const copy = prev.copy();
+                  prev.reset(); // Free the original after copying
+                  return copy;
                 }
                 return prev;
               } catch (error) {
@@ -141,6 +183,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
               if (prev) {
                 try {
                   const finishedPath = prev.copy();
+                  prev.reset(); // Free the original
                   const pathColor = currentColorRef.current;
                   const pathStroke = currentStrokeRef.current;
                   setPaths((prevPaths) => {
@@ -149,9 +192,6 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
                       { path: finishedPath, color: pathColor, strokeWidth: pathStroke },
                     ];
                     onPathsChange?.();
-                    if (next.length > MAX_PATHS_BEFORE_FLATTEN) {
-                      console.warn(`Drawing has ${next.length} paths`);
-                    }
                     return next;
                   });
                 } catch (error) {
@@ -167,11 +207,17 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       []
     );
 
+    // Auto-flatten when path count exceeds threshold
+    useEffect(() => {
+      if (paths.length > MAX_PATHS_BEFORE_FLATTEN) {
+        flattenPaths();
+      }
+    }, [paths.length]);
+
     return (
       <GestureDetector gesture={panGesture}>
         <View style={styles.container} onLayout={handleLayout}>
           <Canvas ref={canvasRef} style={styles.canvas}>
-            {/* Bakgrunnsbilde dekoded via Skia — fungerer på Android */}
             {bgSkImage && canvasSize.width > 0 && (
               <SkiaImage
                 image={bgSkImage}
