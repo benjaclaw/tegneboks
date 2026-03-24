@@ -33,7 +33,8 @@
     "owner": "benjaclaw",
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "./plugins/withAndroidSigning"
     ],
     "extra": {
       "router": {},
