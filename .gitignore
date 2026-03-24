@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+store-listing/doodl-release.aab
+store-listing/doodl-release.apk
+android-release.keystore
